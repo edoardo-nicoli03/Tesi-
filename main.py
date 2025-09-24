@@ -62,13 +62,13 @@ class KinematicBycicleModel:
 
         return np.array([X_dot, Y_dot, phi_dot, vx_dot, vy_dot, omega_dot])
 
-    class DynamicBicycleModel:
-        def __init__ (self, wheelbase: float = 2.7, mass: float = 1500.0, inertia: float = 3000.0):
+class DynamicBicycleModel:
+         def __init__ (self, wheelbase: float = 2.7, mass: float = 1500.0, inertia: float = 3000.0):
             self.wb = wheelbase
             self.mass = mass #massa veicolo
             self.inertia = inertia #inerzia veicolo
 
-        def f(self, state: VehicleState, input: VehicleInput) -> np.ndarray:
+         def f(self, state: VehicleState, input: VehicleInput) -> np.ndarray:
             X_dot = state.vx * np.cos(state.phi) - state.vy * np.sin(state.phi)
             Y_dot = state.vx * np.sin(state.phi) + state.vy * np.cos(state.phi)
             phi_dot = state.omega
@@ -96,3 +96,38 @@ class KinematicBycicleModel:
 
  "Discretizzazione con Eulero"
 class VehicleIntegrator :
+       def __init__ (self , model , dt: float = 0.01):  #valore del tempo di campionamento impostato a 0.01
+           self.model = model
+           self.dt = dt
+
+       def Eulero (self , state : VehicleState, input: VehicleInput)-> VehicleState:
+           """
+           Discretizzazione con Eulero esplicita
+           formula : [ x_{k+1} - x_{k} ] / dt = f(x_{k}, u_{k}
+           Passi :
+           1 Calcolare State_dot =  f(x_{k}, u_{k} usando modello veicolo
+           2 Moltiplicare State_dot per il tempo di campionamento prescelto dt
+           3 Sommarlo allo stato corrente x_{k}
+           4 normalizzare l'angolo
+
+           """
+
+           state_dot = self.model.f(state, input) #derivate dei 6 elementi
+
+           x_k = state.to_array() #converto lo stato attuale in array in modo da poter svolgere le operazioni
+
+           x_k_plus1 = x_k + self.dt * state_dot #calcolo effettivo di x_{k+1} = x_k + dt * f(x_{k}, u{k})
+
+           x_k_plus1[2]= self._normalize_angle(x_k_plus1[2]) #normalizzo l'angolo tra pigreco e -pigreco, è un array quindi sto cambiando il secondo elemento della variabile (l'angolo phi)
+
+           return VehicleState.from_array(x_k_plus1)
+
+
+
+
+
+
+
+
+
+
