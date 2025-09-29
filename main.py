@@ -85,16 +85,17 @@ class DynamicBicycleModel:
             M_z = F_lat * l_f
 
             # Equazioni dinamiche nel body frame
-            vx_dot = F_long / self.m + state.vy * state.omega  # effetto centripeto
-            vy_dot = F_lat / self.m - state.vx * state.omega  # effetto centripeto
-            omega_dot = M_z / self.Iz
+            vx_dot = F_long / self.mass + state.vy * state.omega  # effetto centripeto
+            vy_dot = F_lat / self.mass - state.vx * state.omega  # effetto centripeto
+            omega_dot = M_z / self.inertia
 
             return np.array([X_dot, Y_dot, phi_dot, vx_dot, vy_dot, omega_dot])
+         
 
 
 
 
- "Discretizzazione con Eulero"
+      #DISCRETIZZAZIONE CON EULERO
 class VehicleIntegrator :
        def __init__ (self , model , dt: float = 0.01):  #valore del tempo di campionamento impostato a 0.01
            self.model = model
@@ -123,6 +124,143 @@ class VehicleIntegrator :
            return VehicleState.from_array(x_k_plus1)
 
 
+      #IMPLEMENTAZIONE PUREPURSUIT
+
+       def __init__ (self, wheelbase: float = 2.7 , lookahead_base: float = 3.0, lookahead_gain: float = 0.2):
+
+
+           self.wb = wheelbase
+           self.L_base = lookahead_base
+           self.L_gain = lookahead_gain
+
+       def pure_pursuit(self, state: VehicleState, path: List[Tuple[float, float]],
+                        vx_desired : float = 8.0)-> Tuple[float, float]:
+
+           """Algoritmo Pure Pursuit principale
+
+        Passo-passo:
+        1. Calcola distanza lookahead L adattiva
+        2. Trova look-ahead point sulla traiettoria
+        3. Calcola angolo alpha tra heading e vettore verso look-ahead
+        4. Calcola curvatura desiderata k usando formula Pure Pursuit
+        5. Converte in omega_star = vx_star * k
+        6. Ritorna omega_star, vx_star per i PID
+
+        Args:
+            state: stato corrente del veicolo
+            path: lista di waypoint [(x1,y1), (x2,y2), ...]
+            vx_desired: velocità longitudinale desiderata [m/s]
+
+        Returns:
+            omega_star: velocità angolare di riferimento [rad/s]
+            vx_star: velocità longitudinale di riferimento [m/s]
+        """
+
+           current_speed = np.sqrt(state.vx**2 + state.vy**2)
+           L = self.L_base + self.L_gain * current_speed
+
+           lookahead_point = self._find_lookahead_point(state, path, L)
+
+           if lookahead_point is None:
+               lookahead_point = path[-1] #Se il lookahead poin è nullo allora prendo l'ultimo waypoint
+
+           dx = lookahead_point[0] - state.X  # [m]
+           dy = lookahead_point[1] - state.Y  # [m]
+           L_actual = np.sqrt(dx ** 2 + dy ** 2)
+
+           target_angle  = np.arctan2(dy, dx)
+           omega_star = np.arctan2(dy, dx)
+
+           alpha = target_angle - state.phi
+           alpha = self._normalize_angle(alpha)
+
+           if L_actual > 1e-3:  # evita divisione per zero
+               k = 2 * np.sin(alpha) / L_actual  # curvatura [1/m]
+           else:
+               k = 0.0
+
+           vx_star = vx_desired  # velocità desiderata [m/s]
+           omega_star = vx_star * k  # velocità angolare desiderata [rad/s]
+
+           return omega_star, vx_star
+
+       def _find_lookahead_point(self, state: VehicleState, path: List[Tuple[float, float]],
+                                 L: float) -> Optional[Tuple[float, float]]:
+           """
+           Trova il look-ahead point sulla traiettoria
+
+           Algoritmo:
+           1. Trova il waypoint più vicino al veicolo
+           2. Avanza lungo la traiettoria fino a trovare punto a distanza ≥ L
+           3. Interpola linearmente per ottenere esattamente distanza L
+
+           Args:
+               state: stato corrente del veicolo
+               path: lista waypoint
+               L: distanza lookahead desiderata [m]
+
+           Returns:
+               lookahead_point: coordinate (x,y) del punto [m] o None
+           """
+           if len(path) < 2:
+               return None
+
+           vehicle_pos = np.array([state.X, state.Y])  # [m]
+
+           # === Trova waypoint più vicino ===
+           distances = []
+           for point in path:
+               dist = np.linalg.norm(np.array(point) - vehicle_pos)
+               distances.append(dist)
+
+           closest_idx = np.argmin(distances)  # indice punto più vicino
+
+           # === Cerca punto a distanza L ===
+           for i in range(closest_idx, len(path)):
+               point = np.array(path[i])
+               distance = np.linalg.norm(point - vehicle_pos)
+
+               if distance >= L:
+                   if i > closest_idx:
+                       # Interpola tra path[i-1] e path[i]
+                       prev_point = np.array(path[i - 1])
+                       prev_distance = np.linalg.norm(prev_point - vehicle_pos)
+
+                       # Interpolazione lineare per ottenere distanza esatta L
+                       if distance > prev_distance:  # evita divisione per zero
+                           alpha = (L - prev_distance) / (distance - prev_distance)
+                           alpha = np.clip(alpha, 0.0, 1.0)  # limita in [0,1]
+
+                           interpolated_point = prev_point + alpha * (point - prev_point)
+                           return (interpolated_point[0], interpolated_point[1])
+
+                   # Se non serve interpolazione, usa il punto direttamente
+                   return (point[0], point[1])
+
+           # Non trovato: usa ultimo punto del path
+           return path[-1]
+
+       @staticmethod
+       def _normalize_angle(angle: float) -> float:
+           """Normalizza angolo in [-π, π]"""
+           while angle > np.pi:
+               angle -= 2 * np.pi
+           while angle < -np.pi:
+               angle += 2 * np.pi
+           return angle
+
+
+
+
+
+
+
+
+
+
+
+
+ 
 
 
 
