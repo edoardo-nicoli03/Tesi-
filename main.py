@@ -7,13 +7,14 @@ import math
 
  #MODELLO VEICOLO
 @dataclass
+
 class VehicleState:
     X: float  #posizione veicolo sull'asse verticale
     Y: float  #posizione veicolo asse orizzontale
-    phi: float
+    phi: float #orientamento del veicolo rispetto all'asse di riferimento globale (se phi = 0 il veicolo è allineato con l'asse X, se phi è maggiore di 0 il veicolo è ruotato in sento antiorario)
     vx: float  #velocità longitudinale veicolo
     vy: float  #velocità laterale del veicolo
-    omega: float
+    omega: float #velocità angolare, velocità con cui il veicolo ruota attorno al proprio asse
 
 def to_array(self) -> np.ndarray: #converto lo stato in un array per facilitare i calcoli con numpy
     return np.array([self.X, self.Y, self.phi, self.vx, self.vy, self.omega])
@@ -24,65 +25,83 @@ def from_array(cls, arr : np.ndarray) :
 @dataclass
 class VehicleInput:
    d: float  # Duty Cycle - accelerazione del motore
-   delta: float #angolo di sterzo δ [radianti]
+   delta: float  #angolo di sterzo δ [radianti]
+
+   def saturate(self):
+       self.d = np.clip(self.d, 0.0, 1.0)
+       self.delta = np.clip(self.delta, -0.35, 0.35)
+       return self
 
 
 class KinematicBycicleModel:
 
     """ Caratteristiche:
     - Ruote fisse (non si muovono, solo sterzo controllabile)
-    - vy ≈ 0 (nessuna deriva laterale a velocità basse)
+    - vy ≈ 0
     - Nessuna dinamica complessa delle forze
     - Solo equazioni geometriche del bicycle model
-
-    Vantaggi per tesi triennale:
-    - Semplice da comprendere e spiegare
-    - Facile da implementare e debuggare
-    - Focus sui concetti Pure Pursuit
-    - Risultati convincenti per velocità moderate
-
     Input:
     - d: duty cycle motore (ruote posteriori)
     - delta: angolo sterzo (ruote anteriori fisse)"""
 
-    def __init__(self, wheelbase: float = 2.7):  #parametro che indica il passo del veicolo
-        self.wb = wheelbase
+    def __init__(self,
+                 wheelbase: float = 0.062,
+                 mass : float = 0.041,
+                 Cm1: float = 0.287,
+                 Cm2: float = 0.0545,
+                 Cr0: float = 0.0518,
+                 Cr2: float = 0.00035):
+        self.wb = wheelbase #passo veicolo
+        self.mass = mass #massa
+        self.Cm1 = Cm1 #guadagno motore
+        self.Cm2 = Cm2 #drag motore
+        self.Cr0 = Cr0 #resistenza
+        self.Cr2 = Cr2 #resistenza aerodinamica
+
 
     def f(self, state: VehicleState, input: VehicleInput) -> np.ndarray :
 
-        K_motor = 8.0 #guadagno motore per duty cycle
-        K_drag = 0.2 #coefficiente di resistenza aerodinamica
+
         X_dot = state.vx * np.cos(state.phi)
         Y_dot = state.vx * np.sin(state.phi)
         phi_dot = (state.vx / self.wb) * np.tan(input.delta)
 
-        vx_dot = input.d * K_motor - K_drag * state.vx * np.cos(phi_dot)
+        F_motor = input.d * self.Cm1 - input.d * self.Cm2 * state.vx
+
+        F_resistance = -self.Cr0 - self.Cr2 * state.vx**2
+
+        vx_dot = (F_motor + F_resistance) / self.mass
         vy_dot = 0.0
         omega_dot = 0.0
 
         return np.array([X_dot, Y_dot, phi_dot, vx_dot, vy_dot, omega_dot])
 
 class DynamicBicycleModel:
-         def __init__ (self, wheelbase: float = 2.7, mass: float = 1500.0, inertia: float = 3000.0):
+         def __init__ (self, wheelbase: float = 0.062, mass: float = 0.041, inertia: float = 27.8e-6, lf: float = 0.029, lr: float = 0.033):
             self.wb = wheelbase
             self.mass = mass #massa veicolo
             self.inertia = inertia #inerzia veicolo
+            self.lf = lf #distanza CG-asse anteriore
+            self.lr = lr #distanza CG-asse posteriore
+
+            self.Cm1 = 0.287
+            self.Cm2 = 0.0545
+            self.Cr0 = 0.0518
+            self.Cr2 = 0.00035
+            self.C_lat = 5.0
 
          def f(self, state: VehicleState, input: VehicleInput) -> np.ndarray:
             X_dot = state.vx * np.cos(state.phi) - state.vy * np.sin(state.phi)
             Y_dot = state.vx * np.sin(state.phi) + state.vy * np.cos(state.phi)
             phi_dot = state.omega
-            K_motor = 8000.0
-            K_drag = 400.0
-            K_roll = 200.0
 
-            F_long = input.d * K_motor - K_drag * state.vx * np.sign(state.vx)
-            C_lat = 15000.0  # rigidezza pneumatico laterale [N/rad]
-            F_lat = -C_lat * input.delta * (state.vx / 10.0)  # normalizzato per vx=10m/s
+            F_motor = input.d * self.Cm1 - input.d * self.Cm2 * state.vx
+            F_resistance = -self.Cr0 - self.Cr2 * state.vx**2
+            F_long = F_motor + F_resistance
 
-            # Momento di imbardata (da forza laterale sull'asse anteriore)
-            l_f = self.wb * 0.6  # distanza baricentro-asse anteriore [m]
-            M_z = F_lat * l_f
+            F_lat = -self.C_lat * input.delta * (state.vx/1.0)
+
+            M_z = F_lat * self.lf
 
             # Equazioni dinamiche nel body frame
             vx_dot = F_long / self.mass + state.vy * state.omega  # effetto centripeto
@@ -90,12 +109,9 @@ class DynamicBicycleModel:
             omega_dot = M_z / self.inertia
 
             return np.array([X_dot, Y_dot, phi_dot, vx_dot, vy_dot, omega_dot])
-         
 
 
-
-
-      #DISCRETIZZAZIONE CON EULERO
+#DISCRETIZZAZIONE CON EULERO
 class VehicleIntegrator :
        def __init__ (self , model , dt: float = 0.01):  #valore del tempo di campionamento impostato a 0.01
            self.model = model
@@ -126,35 +142,39 @@ class VehicleIntegrator :
 
       #IMPLEMENTAZIONE PUREPURSUIT
 
-       def __init__ (self, wheelbase: float = 2.7 , lookahead_base: float = 3.0, lookahead_gain: float = 0.2):
+       def __init__ (self, wheelbase: float = 0.062 , lookahead_base: float = 0.15, lookahead_gain: float = 0.1, max_steering: float = 0.35, max_speed = 3.5):
 
 
            self.wb = wheelbase
            self.L_base = lookahead_base
            self.L_gain = lookahead_gain
-
-       def pure_pursuit(self, state: VehicleState, path: List[Tuple[float, float]],
-                        vx_desired : float = 8.0)-> Tuple[float, float]:
+           self.max_steering = max_steering
+           self.max_speed = max_speed
 
            """Algoritmo Pure Pursuit principale
 
-        Passo-passo:
-        1. Calcola distanza lookahead L adattiva
-        2. Trova look-ahead point sulla traiettoria
-        3. Calcola angolo alpha tra heading e vettore verso look-ahead
-        4. Calcola curvatura desiderata k usando formula Pure Pursuit
-        5. Converte in omega_star = vx_star * k
-        6. Ritorna omega_star, vx_star per i PID
+               Passo-passo:
+               1. Calcola distanza lookahead L adattiva
+               2. Trova look-ahead point sulla traiettoria
+               3. Calcola angolo alpha tra heading e vettore verso look-ahead
+               4. Calcola curvatura desiderata k usando formula Pure Pursuit
+               5. Converte in omega_star = vx_star * k
+               6. Ritorna omega_star, vx_star per i PID
 
-        Args:
-            state: stato corrente del veicolo
-            path: lista di waypoint [(x1,y1), (x2,y2), ...]
-            vx_desired: velocità longitudinale desiderata [m/s]
+               Args:
+                   state: stato corrente del veicolo
+                   path: lista di waypoint [(x1,y1), (x2,y2), ...]
+                   vx_desired: velocità longitudinale desiderata [m/s]
 
-        Returns:
-            omega_star: velocità angolare di riferimento [rad/s]
-            vx_star: velocità longitudinale di riferimento [m/s]
-        """
+               Returns:
+                   omega_star: velocità angolare di riferimento [rad/s]
+                   vx_star: velocità longitudinale di riferimento [m/s]
+               """
+
+       def pure_pursuit(self, state: VehicleState, path: List[Tuple[float, float]],
+                        vx_desired : float = 1.0)-> Tuple[float, float]:
+
+
 
            current_speed = np.sqrt(state.vx**2 + state.vy**2)
            L = self.L_base + self.L_gain * current_speed
@@ -169,7 +189,6 @@ class VehicleIntegrator :
            L_actual = np.sqrt(dx ** 2 + dy ** 2)
 
            target_angle  = np.arctan2(dy, dx)
-           omega_star = np.arctan2(dy, dx)
 
            alpha = target_angle - state.phi
            alpha = self._normalize_angle(alpha)
@@ -181,11 +200,12 @@ class VehicleIntegrator :
 
            vx_star = vx_desired  # velocità desiderata [m/s]
            omega_star = vx_star * k  # velocità angolare desiderata [rad/s]
+           omega_star = np.clip (omega_star, 8.0, 8.0)
 
            return omega_star, vx_star
 
        def _find_lookahead_point(self, state: VehicleState, path: List[Tuple[float, float]],
-                                 L: float) -> Optional[Tuple[float, float]]:
+                                 L: float) -> Tuple[float, float]:
            """
            Trova il look-ahead point sulla traiettoria
 
