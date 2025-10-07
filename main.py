@@ -8,7 +8,6 @@ import math
 
 
 def normalize_angle(angle: float) -> float:
-    """Normalizza angolo in [-π, π]"""
     while angle > np.pi:
         angle -= 2 * np.pi
     while angle < -np.pi:
@@ -47,15 +46,6 @@ class VehicleInput:
 
 
 class KinematicBicycleModel:
-
-    """ Caratteristiche:
-    - Ruote fisse (non si muovono, solo sterzo controllabile)
-    - vy ≈ 0
-    - Nessuna dinamica complessa delle forze
-    - Solo equazioni geometriche del bicycle model
-    Input:
-    - d: duty cycle motore (ruote posteriori)
-    - delta: angolo sterzo (ruote anteriori fisse)"""
 
     def __init__(self,
                  wheelbase: float = 0.062,
@@ -176,15 +166,6 @@ class PurePursuit :
                4. Calcola curvatura desiderata k usando formula Pure Pursuit
                5. Converte in omega_star = vx_star * k
                6. Ritorna omega_star, vx_star per i PID
-
-               Args:
-                   state: stato corrente del veicolo
-                   path: lista di waypoint [(x1,y1), (x2,y2), ...]
-                   vx_desired: velocità longitudinale desiderata [m/s]
-
-               Returns:
-                   omega_star: velocità angolare di riferimento [rad/s]
-                   vx_star: velocità longitudinale di riferimento [m/s]
                """
 
        def pure_pursuit(self, state: VehicleState, path: List[Tuple[float, float]],
@@ -229,14 +210,6 @@ class PurePursuit :
            1. Trova il waypoint più vicino al veicolo
            2. Avanza lungo la traiettoria fino a trovare punto a distanza ≥ L
            3. Interpola linearmente per ottenere esattamente distanza L
-
-           Args:
-               state: stato corrente del veicolo
-               path: lista waypoint
-               L: distanza lookahead desiderata [m]
-
-           Returns:
-               lookahead_point: coordinate (x,y) del punto [m] o None
            """
            if len(path) < 2:
                return None
@@ -265,7 +238,7 @@ class PurePursuit :
                        # Interpolazione lineare per ottenere distanza esatta L
                        if distance > prev_distance:  # evita divisione per zero
                            alpha = (L - prev_distance) / (distance - prev_distance)
-                           alpha = np.clip(alpha, 0.0, 1.0)  # limita in [0,1]
+                           alpha = np.clip(alpha, 0.0, 1.0)
 
                            interpolated_point = prev_point + alpha * (point - prev_point)
                            return (interpolated_point[0], interpolated_point[1])
@@ -288,15 +261,14 @@ def test_1_vehicle_state():
     state = VehicleState(X=1.0, Y=2.0, phi=0.5, vx=3.0, vy=0.1, omega=0.2)
     print(f"Stato originale: {state}")
 
-    # Test to_array
+
     arr = state.to_array()
     print(f"Array: {arr}")
 
-    # Test from_array
+
     state_restored = VehicleState.from_array(arr)
     print(f"Stato ripristinato: {state_restored}")
 
-    # Verifica
     assert np.allclose(state.to_array(), state_restored.to_array()), "❌ ERRORE conversione!"
     print("✅ TEST 1 PASSATO: Conversione array OK\n")
 
@@ -321,7 +293,7 @@ def test_2_kinematic_model():
     print(f"  phi_dot = {state_dot[2]:.3f} rad/s = {np.degrees(state_dot[2]):.1f}°/s")
     print(f"  vx_dot = {state_dot[3]:.3f} m/s²")
 
-    # Verifica fisica
+
     assert state_dot[0] > 0, "❌ X_dot dovrebbe essere positivo!"
     assert abs(state_dot[1]) < 0.2, "❌ Y_dot dovrebbe essere piccolo!"
     assert state_dot[4] == 0, "❌ vy_dot dovrebbe essere 0 (cinematico)!"
@@ -343,13 +315,12 @@ def test_3_integration():
 
     print(f"Stato iniziale: X={state.X:.3f}, Y={state.Y:.3f}, phi={np.degrees(state.phi):.1f}°")
 
-    # Simula 10 step
+
     for i in range(10):
         state = integrator.Eulero(state, input_cmd)
 
     print(f"Dopo 10 step (0.1s): X={state.X:.3f}, Y={state.Y:.3f}, phi={np.degrees(state.phi):.1f}°")
 
-    # Verifica movimento
     assert state.X > 0, "❌ Il veicolo dovrebbe essersi mosso in avanti!"
     assert abs(state.phi) > 0, "❌ Il veicolo dovrebbe aver ruotato!"
 
@@ -362,7 +333,7 @@ def test_4_pure_pursuit():
     print("TEST 4: Pure Pursuit")
     print("=" * 60)
 
-    # Crea traiettoria semplice (linea retta)
+
     path = [(i * 0.1, 0.0) for i in range(20)]
 
     pure_pursuit = PurePursuit()
@@ -377,9 +348,7 @@ def test_4_pure_pursuit():
     print(f"  omega_star = {omega_star:.3f} rad/s")
     print(f"  vx_star = {vx_star:.2f} m/s")
 
-    # Verifica logica
-    # Il veicolo è sopra la traiettoria (Y>0) e punta leggermente verso l'alto (phi>0)
-    # Dovrebbe voler ruotare verso il basso (omega_star < 0)
+
     print(f"\nVerifica logica:")
     print(f"  Veicolo sopra traiettoria (Y={state.Y:.3f} > 0) → dovrebbe girare verso basso")
     print(f"  omega_star = {omega_star:.3f} {'✅ negativo!' if omega_star < 0 else '⚠️ dovrebbe essere negativo'}")
@@ -393,19 +362,19 @@ def test_5_complete_simulation():
     print("TEST 5: Simulazione Completa (50 step)")
     print("=" * 60)
 
-    # Setup
+
     model = KinematicBicycleModel()
     integrator = VehicleIntegrator(model, dt=0.01)
     pure_pursuit = PurePursuit()
 
-    # Traiettoria: linea retta poi curva
+
     path = [(i * 0.05, 0.0) for i in range(30)]
     path.extend([(1.5 + 0.2 * np.cos(t), 0.2 * np.sin(t)) for t in np.linspace(0, np.pi / 2, 20)])
 
-    # Stato iniziale
+
     state = VehicleState(X=0, Y=0, phi=0, vx=0.5, vy=0, omega=0)
 
-    # Storia per plotting
+
     history_X = [state.X]
     history_Y = [state.Y]
     history_vx = [state.vx]
@@ -413,18 +382,17 @@ def test_5_complete_simulation():
     print("Simulazione in corso...")
 
     for step in range(50):
-        # Pure Pursuit calcola riferimenti
+
         omega_star, vx_star = pure_pursuit.pure_pursuit(state, path, vx_desired=1.0)
 
-        # Per ora: comando semplificato (senza PID)
-        # In futuro qui ci saranno i PID
+
         input_cmd = VehicleInput(d=0.6, delta=0.1 * omega_star)
         input_cmd.saturate()
 
-        # Integra dinamica
+
         state = integrator.Eulero(state, input_cmd)
 
-        # Salva storia
+
         history_X.append(state.X)
         history_Y.append(state.Y)
         history_vx.append(state.vx)
@@ -435,10 +403,10 @@ def test_5_complete_simulation():
     print(f"\nPosizione finale: X={state.X:.3f}, Y={state.Y:.3f}")
     print(f"Velocità finale: vx={state.vx:.2f} m/s")
 
-    # Plot risultati
+
     plt.figure(figsize=(14, 5))
 
-    # Plot 1: Traiettoria 2D
+
     plt.subplot(1, 3, 1)
     path_array = np.array(path)
     plt.plot(path_array[:, 0], path_array[:, 1], 'r--', linewidth=2, label='Riferimento')
@@ -452,7 +420,7 @@ def test_5_complete_simulation():
     plt.grid(True, alpha=0.3)
     plt.axis('equal')
 
-    # Plot 2: Posizione X nel tempo
+
     plt.subplot(1, 3, 2)
     time = np.arange(len(history_X)) * 0.01
     plt.plot(time, history_X, 'b-', linewidth=2)
