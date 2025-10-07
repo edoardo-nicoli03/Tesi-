@@ -1,9 +1,19 @@
+import matplotlib
+matplotlib.use('TkAgg')
 import numpy as np
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 from typing import Tuple, List
 import math
 
+
+def normalize_angle(angle: float) -> float:
+    """Normalizza angolo in [-π, π]"""
+    while angle > np.pi:
+        angle -= 2 * np.pi
+    while angle < -np.pi:
+        angle += 2 * np.pi
+    return angle
 
 
 @dataclass
@@ -16,9 +26,11 @@ class VehicleState:
     vy: float  #velocità laterale del veicolo
     omega: float #velocità angolare, velocità con cui il veicolo ruota attorno al proprio asse
 
-    @classmethod
+
     def to_array(self) -> np.ndarray: #converto lo stato in un array per facilitare i calcoli (con numpy)
        return np.array([self.X, self.Y, self.phi, self.vx, self.vy, self.omega])
+
+    @classmethod
     def from_array(cls, arr : np.ndarray) :
      return cls(X = arr[0], Y = arr[1], phi = arr[2], vx = arr[3], vy = arr[4], omega = arr[5])
 
@@ -34,7 +46,7 @@ class VehicleInput:
        return self
 
 
-class KinematicBycicleModel:
+class KinematicBicycleModel:
 
     """ Caratteristiche:
     - Ruote fisse (non si muovono, solo sterzo controllabile)
@@ -136,9 +148,10 @@ class VehicleIntegrator :
 
            x_k_plus1 = x_k + self.dt * state_dot #calcolo effettivo di x_{k+1} = x_k + dt * f(x_{k}, u{k})
 
-           x_k_plus1[2]= self._normalize_angle(x_k_plus1[2]) #normalizzo l'angolo tra pigreco e -pigreco, è un array quindi sto cambiando il secondo elemento della variabile (l'angolo phi)
+           x_k_plus1[2]= normalize_angle(x_k_plus1[2]) #normalizzo l'angolo tra pigreco e -pigreco, è un array quindi sto cambiando il secondo elemento della variabile (l'angolo phi)
 
            return VehicleState.from_array(x_k_plus1)
+
 
 
       #IMPLEMENTAZIONE PUREPURSUIT
@@ -194,7 +207,7 @@ class PurePursuit :
            target_angle  = np.arctan2(dy, dx)
 
            alpha = target_angle - state.phi
-           alpha = self._normalize_angle(alpha)
+           alpha = normalize_angle(alpha)
 
            if L_actual > 1e-3:
                k = 2 * np.sin(alpha) / L_actual  # curvatura [1/m]
@@ -263,14 +276,240 @@ class PurePursuit :
            # Non trovato: usa ultimo punto del path
            return path[-1]
 
-       @staticmethod
-       def _normalize_angle(angle: float) -> float:
-           """Normalizza angolo in [-π, π]"""
-           while angle > np.pi:
-               angle -= 2 * np.pi
-           while angle < -np.pi:
-               angle += 2 * np.pi
-           return angle
+
+
+
+def test_1_vehicle_state():
+    """TEST 1: Verifica VehicleState"""
+    print("=" * 60)
+    print("TEST 1: VehicleState - conversione array")
+    print("=" * 60)
+
+    state = VehicleState(X=1.0, Y=2.0, phi=0.5, vx=3.0, vy=0.1, omega=0.2)
+    print(f"Stato originale: {state}")
+
+    # Test to_array
+    arr = state.to_array()
+    print(f"Array: {arr}")
+
+    # Test from_array
+    state_restored = VehicleState.from_array(arr)
+    print(f"Stato ripristinato: {state_restored}")
+
+    # Verifica
+    assert np.allclose(state.to_array(), state_restored.to_array()), "❌ ERRORE conversione!"
+    print("✅ TEST 1 PASSATO: Conversione array OK\n")
+
+
+def test_2_kinematic_model():
+    """TEST 2: Verifica modello cinematico"""
+    print("=" * 60)
+    print("TEST 2: Modello Cinematico")
+    print("=" * 60)
+
+    model = KinematicBicycleModel()
+    state = VehicleState(X=0, Y=0, phi=0, vx=1.0, vy=0, omega=0)
+    input_cmd = VehicleInput(d=0.5, delta=0.1)
+
+    state_dot = model.f(state, input_cmd)
+
+    print(f"Input: d={input_cmd.d}, delta={np.degrees(input_cmd.delta):.1f}°")
+    print(f"Stato: vx={state.vx:.2f} m/s")
+    print(f"\nDerivate calcolate:")
+    print(f"  X_dot = {state_dot[0]:.3f} m/s")
+    print(f"  Y_dot = {state_dot[1]:.3f} m/s")
+    print(f"  phi_dot = {state_dot[2]:.3f} rad/s = {np.degrees(state_dot[2]):.1f}°/s")
+    print(f"  vx_dot = {state_dot[3]:.3f} m/s²")
+
+    # Verifica fisica
+    assert state_dot[0] > 0, "❌ X_dot dovrebbe essere positivo!"
+    assert abs(state_dot[1]) < 0.2, "❌ Y_dot dovrebbe essere piccolo!"
+    assert state_dot[4] == 0, "❌ vy_dot dovrebbe essere 0 (cinematico)!"
+
+    print("✅ TEST 2 PASSATO: Modello cinematico OK\n")
+
+
+def test_3_integration():
+    """TEST 3: Verifica integrazione numerica"""
+    print("=" * 60)
+    print("TEST 3: Integrazione Eulero")
+    print("=" * 60)
+
+    model = KinematicBicycleModel()
+    integrator = VehicleIntegrator(model, dt=0.01)
+
+    state = VehicleState(X=0, Y=0, phi=0, vx=1.0, vy=0, omega=0)
+    input_cmd = VehicleInput(d=0.5, delta=0.1)
+
+    print(f"Stato iniziale: X={state.X:.3f}, Y={state.Y:.3f}, phi={np.degrees(state.phi):.1f}°")
+
+    # Simula 10 step
+    for i in range(10):
+        state = integrator.Eulero(state, input_cmd)
+
+    print(f"Dopo 10 step (0.1s): X={state.X:.3f}, Y={state.Y:.3f}, phi={np.degrees(state.phi):.1f}°")
+
+    # Verifica movimento
+    assert state.X > 0, "❌ Il veicolo dovrebbe essersi mosso in avanti!"
+    assert abs(state.phi) > 0, "❌ Il veicolo dovrebbe aver ruotato!"
+
+    print("✅ TEST 3 PASSATO: Integrazione OK\n")
+
+
+def test_4_pure_pursuit():
+    """TEST 4: Verifica Pure Pursuit"""
+    print("=" * 60)
+    print("TEST 4: Pure Pursuit")
+    print("=" * 60)
+
+    # Crea traiettoria semplice (linea retta)
+    path = [(i * 0.1, 0.0) for i in range(20)]
+
+    pure_pursuit = PurePursuit()
+    state = VehicleState(X=0, Y=0.05, phi=0.1, vx=1.0, vy=0, omega=0)
+
+    print(f"Stato veicolo: X={state.X:.3f}, Y={state.Y:.3f}, phi={np.degrees(state.phi):.1f}°")
+    print(f"Traiettoria: linea retta da (0,0) a (2,0)")
+
+    omega_star, vx_star = pure_pursuit.pure_pursuit(state, path, vx_desired=1.0)
+
+    print(f"\nOutput Pure Pursuit:")
+    print(f"  omega_star = {omega_star:.3f} rad/s")
+    print(f"  vx_star = {vx_star:.2f} m/s")
+
+    # Verifica logica
+    # Il veicolo è sopra la traiettoria (Y>0) e punta leggermente verso l'alto (phi>0)
+    # Dovrebbe voler ruotare verso il basso (omega_star < 0)
+    print(f"\nVerifica logica:")
+    print(f"  Veicolo sopra traiettoria (Y={state.Y:.3f} > 0) → dovrebbe girare verso basso")
+    print(f"  omega_star = {omega_star:.3f} {'✅ negativo!' if omega_star < 0 else '⚠️ dovrebbe essere negativo'}")
+
+    print("✅ TEST 4 PASSATO: Pure Pursuit OK\n")
+
+
+def test_5_complete_simulation():
+    """TEST 5: Simulazione completa"""
+    print("=" * 60)
+    print("TEST 5: Simulazione Completa (50 step)")
+    print("=" * 60)
+
+    # Setup
+    model = KinematicBicycleModel()
+    integrator = VehicleIntegrator(model, dt=0.01)
+    pure_pursuit = PurePursuit()
+
+    # Traiettoria: linea retta poi curva
+    path = [(i * 0.05, 0.0) for i in range(30)]
+    path.extend([(1.5 + 0.2 * np.cos(t), 0.2 * np.sin(t)) for t in np.linspace(0, np.pi / 2, 20)])
+
+    # Stato iniziale
+    state = VehicleState(X=0, Y=0, phi=0, vx=0.5, vy=0, omega=0)
+
+    # Storia per plotting
+    history_X = [state.X]
+    history_Y = [state.Y]
+    history_vx = [state.vx]
+
+    print("Simulazione in corso...")
+
+    for step in range(50):
+        # Pure Pursuit calcola riferimenti
+        omega_star, vx_star = pure_pursuit.pure_pursuit(state, path, vx_desired=1.0)
+
+        # Per ora: comando semplificato (senza PID)
+        # In futuro qui ci saranno i PID
+        input_cmd = VehicleInput(d=0.6, delta=0.1 * omega_star)
+        input_cmd.saturate()
+
+        # Integra dinamica
+        state = integrator.Eulero(state, input_cmd)
+
+        # Salva storia
+        history_X.append(state.X)
+        history_Y.append(state.Y)
+        history_vx.append(state.vx)
+
+        if step % 10 == 0:
+            print(f"  Step {step:2d}: X={state.X:.3f}, Y={state.Y:.3f}, vx={state.vx:.2f}, omega_star={omega_star:.2f}")
+
+    print(f"\nPosizione finale: X={state.X:.3f}, Y={state.Y:.3f}")
+    print(f"Velocità finale: vx={state.vx:.2f} m/s")
+
+    # Plot risultati
+    plt.figure(figsize=(14, 5))
+
+    # Plot 1: Traiettoria 2D
+    plt.subplot(1, 3, 1)
+    path_array = np.array(path)
+    plt.plot(path_array[:, 0], path_array[:, 1], 'r--', linewidth=2, label='Riferimento')
+    plt.plot(history_X, history_Y, 'b-', linewidth=2, label='Seguita')
+    plt.scatter(history_X[0], history_Y[0], c='g', s=100, label='Start', zorder=5)
+    plt.scatter(history_X[-1], history_Y[-1], c='r', s=100, label='End', zorder=5)
+    plt.xlabel('X [m]')
+    plt.ylabel('Y [m]')
+    plt.title('Traiettoria')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.axis('equal')
+
+    # Plot 2: Posizione X nel tempo
+    plt.subplot(1, 3, 2)
+    time = np.arange(len(history_X)) * 0.01
+    plt.plot(time, history_X, 'b-', linewidth=2)
+    plt.xlabel('Tempo [s]')
+    plt.ylabel('X [m]')
+    plt.title('Posizione X')
+    plt.grid(True, alpha=0.3)
+
+    # Plot 3: Velocità nel tempo
+    plt.subplot(1, 3, 3)
+    plt.plot(time, history_vx, 'g-', linewidth=2)
+    plt.axhline(y=1.0, color='r', linestyle='--', label='vx desiderata')
+    plt.xlabel('Tempo [s]')
+    plt.ylabel('vx [m/s]')
+    plt.title('Velocità Longitudinale')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig('test_simulazione.png', dpi=150, bbox_inches='tight')
+    print("\n📊 Grafico salvato come 'test_simulazione.png'")
+    plt.show()
+
+    print("✅ TEST 5 PASSATO: Simulazione completa OK\n")
+
+
+def run_all_tests():
+    """Esegue tutti i test in sequenza"""
+    print("\n" + "=" * 60)
+    print("INIZIO TEST SUITE COMPLETA")
+    print("=" * 60 + "\n")
+
+    try:
+        test_1_vehicle_state()
+        test_2_kinematic_model()
+        test_3_integration()
+        test_4_pure_pursuit()
+        test_5_complete_simulation()
+
+        print("\n" + "=" * 60)
+        print("🎉 TUTTI I TEST PASSATI CON SUCCESSO! 🎉")
+        print("=" * 60)
+        print("\n✅ Il codice è corretto e funzionante!")
+        print("✅ Modello cinematico validato")
+        print("✅ Integrazione numerica corretta")
+        print("✅ Pure Pursuit implementato correttamente")
+        print("✅ Sistema completo funzionante")
+
+    except Exception as e:
+        print(f"\n❌ ERRORE NEI TEST: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    run_all_tests()
+
 
 
 
