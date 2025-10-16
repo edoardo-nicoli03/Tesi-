@@ -66,10 +66,6 @@ class PurePursuit:
         """
         Trova il look-ahead point sulla traiettoria
 
-        Algoritmo:
-        1. Trova il waypoint più vicino al veicolo
-        2. Avanza lungo la traiettoria fino a trovare punto a distanza ≥ L
-        3. Interpola linearmente per ottenere esattamente distanza L
         """
         if len(path) < 2:
             return None
