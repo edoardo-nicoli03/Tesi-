@@ -18,16 +18,7 @@ class PurePursuit:
     def __init__(self, wheelbase: float = 0.062, lookahead_base: float = 0.15,
                  lookahead_gain: float = 0.1, max_steering: float = 0.35,
                  max_speed: float = 3.5):
-        """
-        Inizializza il controllore Pure Pursuit
 
-        Args:
-            wheelbase: distanza tra gli assi [m]
-            lookahead_base: distanza lookahead base [m]
-            lookahead_gain: guadagno adattivo lookahead [s]
-            max_steering: massimo angolo di sterzo [rad]
-            max_speed: velocità massima [m/s]
-        """
         self.wb = wheelbase
         self.L_base = lookahead_base
         self.L_gain = lookahead_gain
