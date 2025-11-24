@@ -29,19 +29,18 @@ class PurePursuit:
         """
         Algoritmo Pure Pursuit - calcola l'angolo di sterzo
         """
-        #  Calcola distanza lookahead adattiva
         current_speed = np.sqrt(state.vx ** 2 + state.vy ** 2)
-        L = self.L_base + self.L_gain * current_speed
+        L = self.L_base + self.L_gain * current_speed         #  Calcola distanza lookahead adattiva in base alla velocità current_speed
+
 
         #  Trova lookahead point
         lookahead_point = self._find_lookahead_point(state, path, L)
 
         if lookahead_point is None:
-            lookahead_point = path[-1]
+            lookahead_point = path[-1] #se non trovo  nessun Lookahead_point ritorno a quello prima
 
-        #  Calcola vettore verso lookahead
-        dx = lookahead_point[0] - state.X #distanza x dal lookahead
-        dy = lookahead_point[1] - state.Y #distanza y dal lookahead
+        dx = lookahead_point[0] - state.X  #distanza x dal lookahead
+        dy = lookahead_point[1] - state.Y  #distanza y dal lookahead
         L_actual = np.sqrt(dx ** 2 + dy ** 2)
 
         #  Calcola angolo alpha se alpha è positivo il punto mira a sx sennò a dx

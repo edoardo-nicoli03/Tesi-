@@ -1,20 +1,21 @@
 import matplotlib
+
 matplotlib.use('TkAgg')
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple, List
 from scipy.interpolate import CubicSpline
+
 from Vehicle_model import VehicleIntegrator, VehicleInput, VehicleState, DynamicBicycleModel
 from Vehicle_controller import PurePursuit
 
 
-# TRAIETTORIE PER SIMULAZIONE
+# ==============================================================
+#            TRAIETTORIE PER LA SIMULAZIONE
+# ==============================================================
 
-
-""" Traittoria circolare
-def generate_circular_path(radius: float, center: Tuple[float, float],
+"""def generate_circular_path(radius: float, center: Tuple[float, float],
                            num_points: int = 150) -> List[Tuple[float, float]]:
-    
     cx, cy = center
     angles = np.linspace(0, 2 * np.pi, num_points)
 
@@ -24,29 +25,27 @@ def generate_circular_path(radius: float, center: Tuple[float, float],
         y = cy + radius * np.sin(angle)
         path.append((x, y))
 
+    return path"""
 
-    return path """
 
+"""def generate_figure_eight_path(width: float, num_points: int = 200) -> List[Tuple[float, float]]:
 
-""" Traiettoria a forma di 8
-def generate_figure_eight_path(width: float, num_points: int = 200) -> List[Tuple[float, float]]:
-  
     path = []
     t = np.linspace(0, 2 * np.pi, num_points)
 
-    # Formula della Lemniscata di Gerono
+    # Lemniscata di Gerono
     x = width * np.sin(t)
     y = width * np.sin(t) * np.cos(t)
 
     for i in range(num_points):
         path.append((x[i], y[i]))
 
-    return path """
+    return path"""
 
-""" Percorso rettilineo seguito da una curva a 90 gradi.
-def generate_straight_and_turn_path(straight_len: float, turn_radius: float, num_points: int = 150) -> List[
-    Tuple[float, float]]:
-   
+
+"""def generate_straight_and_turn_path(straight_len: float, turn_radius: float,
+                                    num_points: int = 150) -> List[Tuple[float, float]]:
+
     path = []
 
     # Parte 1: Linea retta
@@ -54,82 +53,72 @@ def generate_straight_and_turn_path(straight_len: float, turn_radius: float, num
     for x in np.linspace(0, straight_len, num_straight):
         path.append((x, 0.0))
 
-    # Parte 2: Curva a 90 gradi
+    # Parte 2: Curva a 90°
     num_turn = num_points - num_straight
     center_x = straight_len
     center_y = turn_radius
 
     for angle in np.linspace(-np.pi / 2, 0, num_turn):
-        x = center_x + turn_radius * np.cos(angle)
-        y = center_y + turn_radius * np.sin(angle)
-        path.append((x, y))
+        px = center_x + turn_radius * np.cos(angle)
+        py = center_y + turn_radius * np.sin(angle)
+        path.append((px, py))
 
-    return path """
+    return path"""
+
+
 def generate_random_spline_path(num_waypoints: int = 7,
                                 x_range: Tuple[float, float] = (0, 10),
                                 y_range: Tuple[float, float] = (-3, 3),
                                 num_points: int = 300) -> List[Tuple[float, float]]:
 
-
     waypoints_x = np.linspace(x_range[0], x_range[1], num_waypoints)
     waypoints_y = np.random.uniform(y_range[0], y_range[1], num_waypoints)
 
-  #punti di partenza della traiettoria in linea con le altre traiettorie
+    # Punto iniziale vincolato a (0, 0)
     waypoints_x[0] = 0
     waypoints_y[0] = 0
 
-    #funzione di interpolazione
+    # interpolazione tramite spline
     spline = CubicSpline(waypoints_x, waypoints_y)
 
-    #  Campiono la curva per creare la traiettoria finale
     x_new = np.linspace(waypoints_x[0], waypoints_x[-1], num_points)
     y_new = spline(x_new)
 
-
-    path = []
-    for i in range(len(x_new)):
-        path.append((x_new[i], y_new[i]))
-
+    path = [(x_new[i], y_new[i]) for i in range(len(x_new))]
     return path
 
 
-def run_simulation():
+# ==============================================================
+#                    SIMULAZIONE
+# ==============================================================
 
-    # parametri di simulazione
-    dt = 0.01  # tempo di campionamento [s]
-    T_sim = 20.0  # durata simulazione [s]
+def run_simulation():
+    dt = 0.01  # [s]
+    T_sim = 20.0
     num_steps = int(T_sim / dt)
 
-    # Duty cycle costante
-    d_constant = 0.25
+    d_constant = 0.25  # duty cycle (fisso)
 
-  # GENERAZIONE TRAIETTORIE
+    # ===== TRAIETTORIA DI RIFERIMENTO =====
+    #radius = 2.0
+    #center = (2.0, 0.0)
 
-   # radius = 2.0  # [m]
-    # center = (2.0, 0.0)  # centro in (2, 0) -> parte da (0, 0)
-    #reference_path per le traiettorie di Cerchio, 8, dritto con curva
-   # reference_path = generate_circular_path(radius, center, num_points=150) #Per cerchio
-   # reference_path = generate_figure_eight_path(width=4.0, num_points=200)  #Per otto
-    #reference_path = generate_straight_and_turn_path(straight_len=3.0, turn_radius=1.5, num_points=200)
+
+    #reference_path = generate_circular_path(radius, center, num_points=150)
+    #reference_path = generate_figure_eight_path(width=4.0, num_points=200)
+    # reference_path = generate_straight_and_turn_path(straight_len=3.0, turn_radius=1.5, num_points=200)
     reference_path = generate_random_spline_path(num_waypoints=8, num_points=300)
 
+    print(f"Numero waypoints: {len(reference_path)}")
 
-    print(f"Numero di waypoints: {len(reference_path)}")
-
-
-    # MODELLO E CONTROLLORE
-
+    # Modello + Controller
     model = DynamicBicycleModel()
     integrator = VehicleIntegrator(model, dt=dt)
     controller = PurePursuit(wheelbase=0.062)
+
     state = VehicleState(X=0.0, Y=0.0, phi=0.0, vx=0.1, vy=0.0, omega=0.0)
 
-
-    # SIMULAZIONE
-
-    print(f"\nInizio simulazione: {num_steps} step, dt={dt}s")
-
-    # Storage per i risultati
+    # Storage
     trajectory_x = [state.X]
     trajectory_y = [state.Y]
     time_history = [0.0]
@@ -137,17 +126,17 @@ def run_simulation():
     vy_history = [state.vy]
     omega_history = [state.omega]
 
+    print(f"\nInizio simulazione: {num_steps} step, dt={dt}s")
+
     for step in range(num_steps):
+
         current_time = step * dt
 
+        delta = controller.pure_pursuit(state, reference_path)
 
-        delta = controller.pure_pursuit(state, reference_path) #delta preso dal Pure_Pursuit
-
-        # Crea input di controllo (duty cycle costante)
         control_input = VehicleInput(d=d_constant, delta=delta)
-        control_input.saturate() #verifico che rispettino i valori di saturazione
+        control_input.saturate()
 
-        # Integrazione numerica con Eulero
         state = integrator.Eulero(state, control_input)
 
         trajectory_x.append(state.X)
@@ -157,39 +146,81 @@ def run_simulation():
         vy_history.append(state.vy)
         omega_history.append(state.omega)
 
-
-        if step % int(2.0 / dt) == 0:
+        if step % int(2 / dt) == 0:
             print(f"t={current_time:.1f}s: pos=({state.X:.3f}, {state.Y:.3f}), "
                   f"vx={state.vx:.3f}, vy={state.vy:.4f}")
 
     print("\nSimulazione completata!")
 
-  # STATISTICHE FINALI
+    # ==============================================================
+    #                STATISTICHE
+    # ==============================================================
 
-    print("\n" + "=" * 60)
-    print("STATISTICHE SIMULAZIONE")
-    print("=" * 60)
-    print(f"Velocità longitudinale media: {np.mean(vx_history):.3f} m/s")
-    print(f"Velocità longitudinale finale: {vx_history[-1]:.3f} m/s")
-    print(f"Velocità laterale max (abs): {np.max(np.abs(vy_history)):.5f} m/s")
-    print(f"Velocità laterale RMS: {np.sqrt(np.mean(np.array(vy_history) ** 2)):.5f} m/s")
-    print(f"Velocità angolare max (abs): {np.max(np.abs(omega_history)):.3f} rad/s")
-
-    # Calcolo errore rispetto alla traiettoria
     errors = []
     for x, y in zip(trajectory_x, trajectory_y):
-        min_dist = float('inf')
-        for ref_x_pt, ref_y_pt in reference_path:
-            dist = np.sqrt((x - ref_x_pt) ** 2 + (y - ref_y_pt) ** 2)
-            if dist < min_dist:
-                min_dist = dist
+        min_dist = min(np.sqrt((x - rx) ** 2 + (y - ry) ** 2) for rx, ry in reference_path)
         errors.append(min_dist)
 
-    print(f"\nErrore di tracking medio: {np.mean(errors):.4f} m")
-    print(f"Errore di tracking max: {np.max(errors):.4f} m")
-    print(f"Errore di tracking quadratico medio: {np.sqrt(np.mean(np.array(errors) ** 2)):.4f} m")
-    print("=" * 60)
+    print("\n=========== STATISTICHE FINE SIMULAZIONE ===========")
+    print(f"Errore medio: {np.mean(errors):.4f} m")
+    print(f"Errore massimo: {np.max(errors):.4f} m")
+    print(f"RMSE errore: {np.sqrt(np.mean(np.array(errors) ** 2)):.4f} m")
+    print("====================================================")
 
+    # ==============================================================
+    #                PLOT
+    # ==============================================================
+
+    # PLOT TRAIETTORIA DI RIFERIMENTO
+    ref_x = [p[0] for p in reference_path]
+    ref_y = [p[1] for p in reference_path]
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(ref_x, ref_y, 'r-', linewidth=2)
+    plt.title("Traiettoria di riferimento (solo percorso)")
+    plt.xlabel("X [m]")
+    plt.ylabel("Y [m]")
+    plt.grid(True)
+    plt.axis("equal")
+    plt.tight_layout()
+    plt.show()
+
+    # Traiettoria XY con percorso seguito
+    plt.figure(figsize=(10, 8))
+    plt.plot(ref_x, ref_y, 'r--', linewidth=2, label='Traiettoria riferimento')
+    plt.plot(trajectory_x, trajectory_y, 'b-', linewidth=1.8, label='Traiettoria seguita')
+    plt.plot(trajectory_x[0], trajectory_y[0], 'go', markersize=8, label='Start')
+    plt.plot(trajectory_x[-1], trajectory_y[-1], 'ms', markersize=8, label='End')
+    plt.xlabel('X [m]')
+    plt.ylabel('Y [m]')
+    plt.title('Traiettoria con Pure Pursuit')
+    plt.legend()
+    plt.grid(True)
+    plt.axis('equal')
+    plt.tight_layout()
+    plt.show()
+
+    # Stati nel tempo
+    fig, axes = plt.subplots(4, 1, figsize=(12, 10))
+
+    axes[0].plot(time_history, vx_history)
+    axes[0].set_ylabel('vx [m/s]')
+    axes[0].grid(True)
+
+    axes[1].plot(time_history, vy_history)
+    axes[1].set_ylabel('vy [m/s]')
+    axes[1].grid(True)
+
+    axes[2].plot(time_history, omega_history)
+    axes[2].set_ylabel('ω [rad/s]')
+    axes[2].grid(True)
+
+    axes[3].plot(time_history, errors)
+    axes[3].set_ylabel('Errore [m]')
+    axes[3].set_xlabel('Tempo [s]')
+    axes[3].grid(True)
+
+    plt.tight_layout()
     plt.show()
 
 

@@ -37,7 +37,7 @@ class VehicleInput:
     d: float  # Duty cycle motore [0, 1]
     delta: float  # Angolo di sterzo [rad]
 
-    def saturate(self):
+    def saturate(self): #funzione per evitare che i miei parametri di input superino certi limiti
         self.d = np.clip(self.d, 0.0, 1.0)
         self.delta = np.clip(self.delta, -0.35, 0.35)
         return self
@@ -54,24 +54,20 @@ class DynamicBicycleModel:
         self.wb = wheelbase
         self.mass = mass
         self.inertia = inertia
-        self.lf = lf
+        self.lf = lf  #distanze dal centro di massa del veicolo asse anteriore e posteriore
         self.lr = lr
 
-        # motore
-        self.Cm1 = 0.287
+        self.Cm1 = 0.287   #$F_{motore} = d \cdot (C_{m1} - C_{m2} \cdot v_x)$. $C_{m1}$
         self.Cm2 = 0.0545
 
-        # resistenza/attrito
-        self.Cr0 = 0.0518
-        self.Cr2 = 0.00035
 
-        # guadagno per "schiacciare" v_y
-        self.k_vy = 10.0
+        self.Cr0 = 0.0518  # resistenza/attrito
+        self.Cr2 = 0.00035
 
        #reattività del veicolo per arrivare all'omega target
         self.tau_omega = 0.05
 
-    def f(self, state: VehicleState, u: VehicleInput) -> np.ndarray:
+    def f(self, state: VehicleState, u: VehicleInput) -> np.ndarray:   # calcolo derivate
 
 
         delta = np.clip(u.delta, -0.35, 0.35)
@@ -89,10 +85,11 @@ class DynamicBicycleModel:
         Y_dot = vx * math.sin(phi) + vy * math.cos(phi)
 
 
-        #calcolo omega_target con protezione
+        #calcolo omega_target
         eps = 1e-8
         vx_for_omega = max(abs(vx), eps) * (1 if vx >= 0 else -1)
         omega_target = (vx_for_omega / self.wb) * math.tan(delta) if abs(self.wb) > eps else 0.0
+        vy_target = omega_target * self.lr
 
 
         phi_dot = omega
@@ -106,9 +103,10 @@ class DynamicBicycleModel:
         vx_dot = (F_motor + F_resistance) / self.mass
 
 
-        vy_dot = - self.k_vy * vy
+       # vy_dot = - self.k_vy * vy #cambiare tornare a modelloo dinamico professore
+        vy_dot = (vy_target - vy) / max(self.tau_omega, 1e-9)
 
-        # omega_dot: tracking verso omega_target con primo ordine (tau piccolo)
+        # omega_dot: tracking verso omega_target
         omega_dot = (omega_target - omega) / max(self.tau_omega, 1e-9)
 
         return np.array([X_dot, Y_dot, phi_dot, vx_dot, vy_dot, omega_dot])
