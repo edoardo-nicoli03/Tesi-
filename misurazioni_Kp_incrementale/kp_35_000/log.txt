@@ -1,0 +1,6 @@
+Test controllo v_x
+kp = 35
+vx_des = 0.5
+durata sim = 10.0s
+dt = 0.01
+vx finale = 0.48953365736329457
