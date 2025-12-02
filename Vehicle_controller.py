@@ -16,7 +16,7 @@ class PurePursuit:
     """Algoritmo Pure Pursuit per il controllo della traiettoria"""
 
     def __init__(self, wheelbase: float = 0.062, lookahead_base: float = 0.15,
-                 lookahead_gain: float = 0.1, max_steering: float = 0.35,
+                 lookahead_gain: float = 0.12, max_steering: float = 0.35,
                  max_speed: float = 3.5):
 
         self.wb = wheelbase
@@ -24,14 +24,16 @@ class PurePursuit:
         self.L_gain = lookahead_gain
         self.max_steering = max_steering
         self.max_speed = max_speed
+        self.L_min = 0.10
+        self.L_max = 0.40
 
     def pure_pursuit(self, state: VehicleState, path: List[Tuple[float, float]]) -> float:
         """
         Algoritmo Pure Pursuit - calcola l'angolo di sterzo
         """
         current_speed = np.sqrt(state.vx ** 2 + state.vy ** 2)
-        L = self.L_base + self.L_gain * current_speed         #  Calcola distanza lookahead adattiva in base alla velocità current_speed
-
+        L = self.L_base + self.L_gain * current_speed   #  Calcola distanza lookahead adattiva in base alla velocità current_speed
+        L = np.clip(L, self.L_min, self.L_max)
 
         #  Trova lookahead point
         lookahead_point = self._find_lookahead_point(state, path, L)

@@ -61,68 +61,71 @@ class DynamicBicycleModel:
         self.Cm2 = 0.0545
 
 
-        self.Cr0 = 0.0518  # resistenza/attrito
+        self.Cr0 = 0.0518 # resistenza/attrito
         self.Cr2 = 0.00035
+        self.Cf = 2
+        self.Cr = 2
 
-       #reattività del veicolo per arrivare all'omega target
-        self.tau_omega = 0.05
-
-    def f(self, state: VehicleState, u: VehicleInput) -> np.ndarray:   # calcolo derivate
-
-
-        delta = np.clip(u.delta, -0.35, 0.35)
-        d = np.clip(u.d, 0.0, 1.0)
-
-        X = state.X
-        Y = state.Y
-        phi = state.phi
-        vx = state.vx
-        vy = state.vy
-        omega = state.omega
-
-        #velocità del veicolo sui due assi cartesiani
-        X_dot = vx * math.cos(phi) - vy * math.sin(phi)
-        Y_dot = vx * math.sin(phi) + vy * math.cos(phi)
+    def f(self, state: VehicleState, u: VehicleInput) -> np.ndarray:
+            delta = np.clip(u.delta, -0.35, 0.35)
+            d = np.clip(u.d, 0.0, 1.0)
 
 
-        #calcolo omega_target
-        eps = 1e-8
-        vx_for_omega = max(abs(vx), eps) * (1 if vx >= 0 else -1)
-        omega_target = (vx_for_omega / self.wb) * math.tan(delta) if abs(self.wb) > eps else 0.0
-        vy_target = omega_target * self.lr
+            vx = state.vx
+            vy = state.vy
+            omega = state.omega
+            phi = state.phi
 
 
-        phi_dot = omega
-
-        # Forze longitudinali
-        F_motor = d * self.Cm1 - d * self.Cm2 * vx
-        # resistenza con segno opposto al movimento
-        F_resistance = - self.Cr0 * np.sign(vx) - self.Cr2 * vx * abs(vx)
-
-        # Dinamica longitudinale
-        vx_dot = (F_motor + F_resistance) / self.mass
+            eps = 1e-4
+            vx_safe = vx if abs(vx) > eps else eps * np.sign(vx) #per evitare divisione per 0
 
 
-       # vy_dot = - self.k_vy * vy #cambiare tornare a modelloo dinamico professore
-        vy_dot = (vy_target - vy) / max(self.tau_omega, 1e-9)
+            # alpha_f = delta - atan((vy + lf*omega) / vx)
+            alpha_f = delta - math.atan((vy + self.lf * omega) / vx_safe)
 
-        # omega_dot: tracking verso omega_target
-        omega_dot = (omega_target - omega) / max(self.tau_omega, 1e-9)
+            # alpha_r = - atan((vy - lr*omega) / vx)
+            alpha_r = - math.atan((vy - self.lr * omega) / vx_safe)
 
-        return np.array([X_dot, Y_dot, phi_dot, vx_dot, vy_dot, omega_dot])
+           # Calcolo delle Forze Laterali (Fy)
+           #ho tolto la magic formula dal codice originale
+            Fy_f = self.Cf * alpha_f
+            Fy_r = self.Cr * alpha_r
+
+
+            Fx = d * self.Cm1 - d * self.Cm2 * vx - self.Cr0 * np.sign(vx) - self.Cr2 * vx * abs(vx)
+
+
+            #vx_dot = (Fx - Fy_f * sin(delta)) / m + vy * omega
+            vx_dot = (Fx - Fy_f * math.sin(delta)) / self.mass + vy * omega
+
+            # Accelerazione laterale
+            # vy_dot = (Fy_r + Fy_f * cos(delta)) / m - vx * omega
+            vy_dot = (Fy_r + Fy_f * math.cos(delta)) / self.mass - vx * omega
+
+            # Accelerazione angolare
+            # omega_dot = (Fy_f * lf * cos(delta) - Fy_r * lr) / I
+            omega_dot = (Fy_f * self.lf * math.cos(delta) - Fy_r * self.lr) / self.inertia
+
+            # Cinematica globale
+            X_dot = vx * math.cos(phi) - vy * math.sin(phi)
+            Y_dot = vx * math.sin(phi) + vy * math.cos(phi)
+            phi_dot = omega
+
+            return np.array([X_dot, Y_dot, phi_dot, vx_dot, vy_dot, omega_dot])
+
+
+
 
 
 class VehicleIntegrator:
-    def __init__(self, model, dt: float = 0.01):
+    def __init__(self, model, dt: float = 0.001):
 
         self.model = model
         self.dt = dt
 
     def Eulero(self, state: VehicleState, input: VehicleInput) -> VehicleState:
-        """
-        Discretizzazione con metodo di Eulero esplicito
-        Formula: x_{k+1} = x_k + dt * f(x_k, u_k)
-        """
+
         # Calcola le derivate
         state_dot = self.model.f(state, input)
 
