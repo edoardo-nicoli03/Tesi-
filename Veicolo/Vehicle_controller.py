@@ -2,14 +2,8 @@ import matplotlib
 matplotlib.use('TkAgg')
 import numpy as np
 from typing import Tuple, List
-from Vehicle_model import VehicleState
+from Veicolo.Vehicle_model import VehicleState, normalize_angle
 
-def normalize_angle(angle: float) -> float:
-    while angle > np.pi:
-        angle -= 2 * np.pi
-    while angle < -np.pi:
-        angle += 2 * np.pi
-    return angle
 
 
 class PurePursuit:
@@ -76,7 +70,7 @@ class PurePursuit:
         # Trova waypoint più vicino
         distances = []
         for point in path:
-            dist = np.linalg.norm(np.array(point) - vehicle_pos) #distanza tra il veicolo e ogni waypoint del percorso
+            dist = np.linalg.norm(np.array(point) - vehicle_pos) #distanza tra il veicolo e ogni waypoint del percorso, calcolo la norma
             distances.append(dist) #aggiungo alla lista il valore appena calcolato
 
         closest_idx = np.argmin(distances) #prendo l'argomento minimo della mia lista

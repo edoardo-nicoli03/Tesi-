@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('TkAgg') #per finestre grafiche
 import numpy as np
 from dataclasses import dataclass
 import math
@@ -88,7 +88,6 @@ class DynamicBicycleModel:
             alpha_r = - math.atan((vy - self.lr * omega) / vx_safe)
 
            # Calcolo delle Forze Laterali (Fy)
-           #ho tolto la magic formula dal codice originale
             Fy_f = self.Cf * alpha_f
             Fy_r = self.Cr * alpha_r
 
@@ -97,7 +96,7 @@ class DynamicBicycleModel:
 
 
             #vx_dot = (Fx - Fy_f * sin(delta)) / m + vy * omega
-            vx_dot = (Fx - Fy_f * math.sin(delta)) / self.mass + vy * omega
+            vx_dot = (Fx - Fy_f * math.sin(delta)) / self.mass + vy * omega # a = F/m
 
             # Accelerazione laterale
             # vy_dot = (Fy_r + Fy_f * cos(delta)) / m - vx * omega

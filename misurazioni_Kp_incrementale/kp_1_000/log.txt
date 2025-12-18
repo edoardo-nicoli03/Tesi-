@@ -1,5 +1,5 @@
 Test controllo v_x
-kp = 1.0
+kp = 1
 vx_des = 0.5
 durata sim = 10.0s
 dt = 0.01
