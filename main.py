@@ -178,7 +178,7 @@ def simulazione_traiettoria (ref_x, ref_y, trajectory_x, trajectory_y, dt, outpu
 
 def run_simulation():
     dt = 0.001  # passo di integrazione
-    T_sim = 20.0 #durata simulazione
+    T_sim = 40.0 #durata simulazione
     num_steps = int(T_sim / dt) #numero di iterazioni del ciclo
 
     d_constant = 0.3  # duty cycle costante
@@ -247,6 +247,7 @@ def run_simulation():
     vx_history = [state.vx]
     vy_history = [state.vy]
     omega_history = [state.omega]
+    d_history = [0.0]
 
     print(f"\nInizio simulazione: {num_steps} step, dt={dt}s")
 
@@ -276,6 +277,7 @@ def run_simulation():
         vx_history.append(state.vx)
         vy_history.append(state.vy)
         omega_history.append(state.omega)
+        d_history.append(d_cmd)
 
         if step % int(2 / dt) == 0:
             print(f"t={current_time:.1f}s: pos=({state.X:.3f}, {state.Y:.3f}), " #se rientro nel tempo, stampo il current_time , la posizione X e Y e vx e vy
@@ -283,9 +285,8 @@ def run_simulation():
 
     print("\nSimulazione completata!")
 
-    # ==============================================================
-    #                STATISTICHE
-    # ==============================================================
+
+
 
     errors = []  #dichiaro array errori
     for x, y in zip(trajectory_x, trajectory_y):
@@ -302,14 +303,35 @@ def run_simulation():
     #                PLOT
     # ==============================================================
 
+    base_dir = "Grafici"
+    tipo_controllo = "azione_proporzionale"
 
-    #CREAZIONE CARTELLE PER I GRAFICI
-    run_name = f"T{T_sim}_dt{dt}_d{d_constant}"
+    dettagli_run = f"Kp{kp}_Vref{vx_des}_T{T_sim}_dt{dt}"
+
+
+    run_dir = os.path.join(base_dir, trajectory_name, tipo_controllo, dettagli_run)
+
+
+    os.makedirs(run_dir, exist_ok=True)
+
+
+    path_file_testo = os.path.join(run_dir, "parametri_simulazione.txt")
+    with open(path_file_testo, "w") as f:
+        f.write("DATI DELL'ESPERIMENTO\n")
+        f.write("=====================\n")
+        f.write(f"Traiettoria: {trajectory_name}\n")
+        f.write(f"Tempo totale (T_sim): {T_sim} s\n")
+        f.write(f"Target Velocità (vx_des): {vx_des} m/s\n")
+        f.write(f"Guadagno Proporzionale (kp): {kp}\n")
+        f.write(f"Passo integrazione (dt): {dt} s\n")
+
+    """run_name = f"T{T_sim}_dt{dt}_d{d_constant}"
     base_dir = "Grafici"
     traj_dir = os.path.join(base_dir, trajectory_name)  #sottocartella per traiettoria
     run_dir = os.path.join(traj_dir, run_name)
 
-    os.makedirs(run_dir, exist_ok=True)
+    os.makedirs(run_dir, exist_ok=True)"""
+
 
 
     #si separano x e y in due liste
@@ -343,7 +365,7 @@ def run_simulation():
     plt.savefig(os.path.join(run_dir, "Traiettoria_Seguita.png"), dpi = 300)
     plt.show()
 
-    fig, axes = plt.subplots(4, 1, figsize=(12, 10)) #4 figure all'interno del file una per vx(t), una per vy(t), una per w(t) e una per l'errore
+    fig, axes = plt.subplots(5, 1, figsize=(12, 12), sharex = True) #5 figure all'interno del file una per vx(t), una per vy(t), una per w(t) e una per l'errore
 
     axes[0].plot(time_history, vx_history)
     axes[0].set_ylabel('vx [m/s]')
@@ -361,6 +383,12 @@ def run_simulation():
     axes[3].set_ylabel('Errore [m]')
     axes[3].set_xlabel('Tempo [s]')
     axes[3].grid(True)
+
+    axes[4].plot(time_history, d_history, color='orange', linewidth=1.5)
+    axes[4].set_ylabel('Duty Cycle [0-1]')
+    axes[4].set_xlabel('Tempo [s]')
+    axes[4].set_ylim(-0.1, 1.1)  # Per vedere bene le saturazioni
+    axes[4].grid(True)
 
     plt.tight_layout()
     plt.savefig(os.path.join(run_dir, "Stati_e_Errore.png"), dpi = 300)
