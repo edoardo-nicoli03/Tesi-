@@ -8,6 +8,7 @@ from typing import Tuple, List
 from scipy.interpolate import splev, splprep
 from Veicolo.Vehicle_model import VehicleIntegrator, VehicleInput, VehicleState, DynamicBicycleModel
 from Veicolo.Vehicle_controller import PurePursuit
+from vxTest import run_vx_test
 
 
 # ==============================================================
@@ -213,7 +214,8 @@ def run_simulation():
 
 
         (1.1, -0.6),
-        (2.1, 0.0)
+        (2.1, 0.0),
+        (3, 0.8)
 
     ]
 
@@ -249,18 +251,35 @@ def run_simulation():
     omega_history = [state.omega]
     d_history = [0.0]
 
-    print(f"\nInizio simulazione: {num_steps} step, dt={dt}s")
+    print(f"\nInizio simulazione: {num_steps} step, dt={dt}s \n" )
+
+    vx_des = 0.8  # velocità desiderata (valore che decido io)
+
+    kp = 10  # guadagno puramente proporzionale
+    omega_cross = 1  # frequenza cross che mi definisce il tempo Ti ovvero, il tempo in cui voglio l'errore venga annullato
+    Ti = 2 / omega_cross  # calcolo il Ti come 2 / omega_cross
+    ki = kp / Ti  # calcolo il fattore di integrazione come rapporto tra il guadagno puramente proporzionale e il tempo Ti
+    error_inte = 0.0
 
     for step in range(num_steps):
+
 
         current_time = step * dt
 
         delta = controller.pure_pursuit(state, reference_path) #il controllore PurePursuit mi restituisce l'angolo delta, ovvero di quanto girare le ruote
 
-        vx_des = 0.8
+
+
+
+        #d_cmd = error_vx * kp  # come si calcolava d con il solo controllore puramente proporzionale
+
         error_vx = vx_des - state.vx
-        kp = 10
-        d_cmd = error_vx * kp
+
+        error_inte += error_vx * dt
+
+        d_cmd = error_inte * ki + kp * error_vx #il nuovo duty cycle è uguale alla somma dei due contributi quello puramente proporzionale moltiplicato per l'errore su vx e quello integrativo moltiplicato per error_inte
+
+
         d_cmd = np.clip(d_cmd, 0, 1.0)
 
 
@@ -304,9 +323,9 @@ def run_simulation():
     # ==============================================================
 
     base_dir = "Grafici"
-    tipo_controllo = "azione_proporzionale"
+    tipo_controllo = "azione_PI"
 
-    dettagli_run = f"Kp{kp}_Vref{vx_des}_T{T_sim}_dt{dt}"
+    dettagli_run = f"Kp{kp}_Ki{ki:.2f}_Ti{Ti:.2f}_T{T_sim}"
 
 
     run_dir = os.path.join(base_dir, trajectory_name, tipo_controllo, dettagli_run)
@@ -381,7 +400,6 @@ def run_simulation():
 
     axes[3].plot(time_history, errors)
     axes[3].set_ylabel('Errore [m]')
-    axes[3].set_xlabel('Tempo [s]')
     axes[3].grid(True)
 
     axes[4].plot(time_history, d_history, color='orange', linewidth=1.5)

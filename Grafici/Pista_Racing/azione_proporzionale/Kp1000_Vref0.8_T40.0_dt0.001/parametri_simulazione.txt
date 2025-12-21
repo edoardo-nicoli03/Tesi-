@@ -1,0 +1,7 @@
+DATI DELL'ESPERIMENTO
+=====================
+Traiettoria: Pista_Racing
+Tempo totale (T_sim): 40.0 s
+Target Velocità (vx_des): 0.8 m/s
+Guadagno Proporzionale (kp): 1000
+Passo integrazione (dt): 0.001 s
