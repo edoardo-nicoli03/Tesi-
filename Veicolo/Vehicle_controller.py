@@ -9,8 +9,8 @@ from Veicolo.Vehicle_model import VehicleState, normalize_angle
 class PurePursuit:
     """Algoritmo Pure Pursuit per il controllo della traiettoria"""
 
-    def __init__(self, wheelbase: float = 0.062, lookahead_base: float = 0.15,
-                 lookahead_gain: float = 0.12, max_steering: float = 0.35,
+    def __init__(self, wheelbase: float = 0.062, lookahead_base: float = 0.80,
+                 lookahead_gain: float = 0.8, max_steering: float = 0.35,
                  max_speed: float = 3.5):
 
         self.wb = wheelbase

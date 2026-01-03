@@ -9,6 +9,7 @@ from scipy.interpolate import splev, splprep
 from Veicolo.Vehicle_model import VehicleIntegrator, VehicleInput, VehicleState, DynamicBicycleModel
 from Veicolo.Vehicle_controller import PurePursuit
 from vxTest import run_vx_test
+import datetime
 
 
 # ==============================================================
@@ -215,7 +216,7 @@ def run_simulation():
 
         (1.1, -0.6),
         (2.1, 0.0),
-        (3, 0.8)
+
 
     ]
 
@@ -253,9 +254,10 @@ def run_simulation():
 
     print(f"\nInizio simulazione: {num_steps} step, dt={dt}s \n" )
 
-    vx_des = 0.8  # velocità desiderata (valore che decido io)
+    l_val = controller.L_base
+    vx_des = 1.5 # velocità desiderata (valore che decido io)
 
-    kp = 10  # guadagno puramente proporzionale
+    kp = 10  # guadagno puramente proporzionaleora
     omega_cross = 1  # frequenza cross che mi definisce il tempo Ti ovvero, il tempo in cui voglio l'errore venga annullato
     Ti = 2 / omega_cross  # calcolo il Ti come 2 / omega_cross
     ki = kp / Ti  # calcolo il fattore di integrazione come rapporto tra il guadagno puramente proporzionale e il tempo Ti
@@ -324,8 +326,8 @@ def run_simulation():
 
     base_dir = "Grafici"
     tipo_controllo = "azione_PI"
-
-    dettagli_run = f"Kp{kp}_Ki{ki:.2f}_Ti{Ti:.2f}_T{T_sim}"
+    ora_attuale = datetime.datetime.now().strftime("%H%M%S")
+    dettagli_run = f"Vel{vx_des}_Kp{kp}_Ki{ki:.2f}_Ti{Ti:.2f}_T{T_sim}_L{l_val}{ora_attuale}"
 
 
     run_dir = os.path.join(base_dir, trajectory_name, tipo_controllo, dettagli_run)
@@ -386,9 +388,11 @@ def run_simulation():
 
     fig, axes = plt.subplots(5, 1, figsize=(12, 12), sharex = True) #5 figure all'interno del file una per vx(t), una per vy(t), una per w(t) e una per l'errore
 
-    axes[0].plot(time_history, vx_history)
+    axes[0].plot(time_history, vx_history, label = 'vx reale')
+    axes[0].axhline(y = vx_des, color = 'brown', linestyle = '--', linewidth = 1.5, label = 'vx des')
     axes[0].set_ylabel('vx [m/s]')
     axes[0].grid(True)
+    axes[0].legend()
 
     axes[1].plot(time_history, vy_history)
     axes[1].set_ylabel('vy [m/s]')
