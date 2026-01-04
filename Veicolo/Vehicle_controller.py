@@ -11,13 +11,14 @@ class PurePursuit:
 
     def __init__(self, wheelbase: float = 0.062, lookahead_base: float = 0.80,
                  lookahead_gain: float = 0.8, max_steering: float = 0.35,
-                 max_speed: float = 3.5):
+                 max_speed: float = 3.5, max_yaw_rate: float = 5.0,):
 
         self.wb = wheelbase
         self.L_base = lookahead_base
         self.L_gain = lookahead_gain
         self.max_steering = max_steering
         self.max_speed = max_speed
+        self.max_yaw_rate = max_yaw_rate
         self.L_min = 0.10
         self.L_max = 0.40
 
@@ -55,6 +56,41 @@ class PurePursuit:
         delta = np.clip(delta, -self.max_steering, self.max_steering) #l'angolo di sterzo deve rispettare questi limiti
 
         return delta
+
+
+    def yaw_rate_des (self, state: VehicleState, path: List[Tuple[float, float]]) -> float:
+        "Metodo per calcolare la velocità angolare desiderata"
+        current_speed = np.sqrt(state.vx ** 2 + state.vy ** 2)
+        L = self.L_base + self.L_gain * current_speed
+        L = np.clip(L, self.L_min, self.L_max)
+
+        lookahead_point = self._find_lookahead_point(state, path, L)
+        if lookahead_point is None:
+            return 0.0
+        dx = lookahead_point[0] - state.X
+        dy = lookahead_point[1] - state.Y
+        L_actual = np.sqrt(dx ** 2 + dy ** 2)
+
+        # 4. Calcola angolo alpha
+        target_angle = np.arctan2(dy, dx)
+        alpha = normalize_angle(target_angle - state.phi)
+
+        # 5. Calcola curvatura
+        if L_actual > 1e-3:
+            k = 2 * np.sin(alpha) / L_actual
+        else:
+            k = 0.0
+
+        # 6. Converti curvatura in velocità angolare desiderata
+        # ω_des = κ · v_x
+        vx_safe = max(abs(state.vx), 0.1)  # Evita divisione per zero
+        omega_des = k * vx_safe
+
+        # 7. Limita ai valori fisicamente realizzabili
+        omega_des = np.clip(omega_des, -self.max_yaw_rate, self.max_yaw_rate)
+
+        return omega_des
+
     def _find_lookahead_point(self, state: VehicleState,
                               path: List[Tuple[float, float]],
                               L: float) -> Tuple[float, float]:
