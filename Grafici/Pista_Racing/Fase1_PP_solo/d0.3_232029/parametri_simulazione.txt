@@ -1,0 +1,22 @@
+FASE 1: PURE PURSUIT + DUTY CYCLE COSTANTE
+======================================================================
+Traiettoria: Pista_Racing
+Tempo simulazione: 40.0 s
+dt: 0.001 s
+Numero step: 40000
+
+CONFIGURAZIONE CONTROLLO:
+  Controllo laterale: Pure Pursuit → delta (DIRETTO)
+  Controllo longitudinale: NESSUNO
+  Duty cycle: 0.3 (COSTANTE)
+  Lookahead base: 0.15 m
+  Lookahead gain: 0.12
+
+STATISTICHE:
+  Errore medio: 0.0323 m
+  Errore max: 0.2425 m
+  Errore RMS: 0.0431 m
+
+  vx media: 1.769 m/s
+  vx range: [0.083, 1.986] m/s
+  vx std dev: 0.316 m/s

@@ -1,0 +1,25 @@
+CONTROLLO IN CASCATA
+======================================================================
+Architettura:
+  Pure Pursuit -> omega_des -> PID laterale -> delta
+  PI longitudinale -> duty cycle
+
+Traiettoria: Circolare
+Tempo simulazione: 40.0 s
+dt: 0.001 s
+Numero step: 40000
+
+CONTROLLORE LONGITUDINALE (vx -> d):
+  Tipo: PI
+  vx_des: 1.5 m/s
+  Kp: 10.0
+  Ki: 5.0
+
+CONTROLLORE LATERALE (ω -> δ):
+  Tipo: P
+  Kp: 0.5
+
+STATISTICHE:
+  Errore medio: 0.0229 m
+  Errore max: 0.1967 m
+  Errore RMS: 0.0296 m
