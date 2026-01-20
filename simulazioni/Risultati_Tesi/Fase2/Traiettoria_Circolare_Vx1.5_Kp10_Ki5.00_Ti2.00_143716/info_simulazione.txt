@@ -1,0 +1,11 @@
+PARAMETRI CONFIGURATI:
+- Kp: 10
+- Ki: 5.0
+- Ti: 2.0
+- Vx_target: 1.5
+- dt: 0.001
+- T_sim: 40.0
+
+RISULTATI OTTENUTI:
+- Errore_Medio: 0.02313912808561022
+- Errore_Max: 0.209539044628712

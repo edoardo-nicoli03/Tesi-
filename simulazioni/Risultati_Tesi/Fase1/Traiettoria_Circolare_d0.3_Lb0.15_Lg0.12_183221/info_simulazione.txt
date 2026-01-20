@@ -1,0 +1,12 @@
+PARAMETRI CONFIGURATI:
+- Controllo: Pure Pursuit (Solo)
+- Duty_Cycle: 0.3
+- L_base: 0.15
+- L_gain: 0.12
+- T_sim: 40.0
+
+RISULTATI OTTENUTI:
+- Errore_Medio: 28465.225476375304
+- Errore_Max: 48000.92987426847
+- Errore_RMS: 30400.550261218985
+- vx_media: 2.4197816810586907

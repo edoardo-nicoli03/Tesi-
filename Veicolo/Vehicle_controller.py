@@ -51,7 +51,7 @@ class PurePursuit:
         else:
             k = 0.0
 
-        #  Converte curvatura in angolo di sterzo delta
+
         delta = np.arctan(k * self.wb)
         delta = np.clip(delta, -self.max_steering, self.max_steering) #l'angolo di sterzo deve rispettare questi limiti
 
@@ -71,22 +71,20 @@ class PurePursuit:
         dy = lookahead_point[1] - state.Y
         L_actual = np.sqrt(dx ** 2 + dy ** 2)
 
-        # 4. Calcola angolo alpha
         target_angle = np.arctan2(dy, dx)
         alpha = normalize_angle(target_angle - state.phi)
 
-        # 5. Calcola curvatura
+
         if L_actual > 1e-3:
             k = 2 * np.sin(alpha) / L_actual
         else:
             k = 0.0
 
-        # 6. Converti curvatura in velocità angolare desiderata
-        # ω_des = κ · v_x
+
         vx_safe = max(abs(state.vx), 0.1)  # Evita divisione per zero
         omega_des = k * vx_safe
 
-        # 7. Limita ai valori fisicamente realizzabili
+
         omega_des = np.clip(omega_des, -self.max_yaw_rate, self.max_yaw_rate)
 
         return omega_des

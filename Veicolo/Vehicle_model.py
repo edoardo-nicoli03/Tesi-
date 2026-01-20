@@ -32,6 +32,7 @@ class VehicleState:
                    vx=arr[3], vy=arr[4], omega=arr[5])
 
 
+
 @dataclass
 class VehicleInput:
     d: float  # Duty cycle motore [0, 1]
@@ -139,3 +140,67 @@ class VehicleIntegrator:
 
         #  Converte in stato
         return VehicleState.from_array(x_k_plus1)
+
+
+
+
+class Generator_Noise:
+
+    def __init__(self,
+                 disturb_vx: bool = False,
+                 disturb_omega: bool = False,
+                 disturb_position: bool = False,
+                 disturb_heading: bool = False,
+                 magnitude: float = 0.1,
+                 magnitude_position: float = 0.02,
+                 magnitude_heading: float = 0.02,
+                 frequency: float = 0.5,
+                 disturbance_type: str = "noise"):
+
+        self.disturb_vx = disturb_vx
+        self.disturb_omega = disturb_omega
+        self.disturb_position = disturb_position
+        self.disturb_heading = disturb_heading
+        self.magnitude = magnitude
+
+        self.magnitude_position = magnitude_position
+        self.magnitude_heading = magnitude_heading
+        self.frequency = frequency
+        self.disturbance_type = disturbance_type
+
+    def get_disturbance(self, t: float, var_name: str) -> float:
+
+
+        if var_name == 'vx' and not self.disturb_vx:
+            return 0.0
+        if var_name == 'omega' and not self.disturb_omega:
+            return 0.0
+        if var_name == 'position' and not self.disturb_position:
+            return 0.0
+        if var_name == 'heading' and not self.disturb_heading:
+            return 0.0
+
+        # Scegli la magnitudine corretta
+        if var_name == 'position':
+            mag = self.magnitude_position
+        elif var_name == 'heading':
+            mag = self.magnitude_heading
+        else:
+            mag = self.magnitude
+
+        # Calcola il disturbo in base al tipo
+        if self.disturbance_type == "noise":
+            return np.random.normal(0, mag)
+
+        elif self.disturbance_type == "sinusoidal":
+            return mag * np.sin(2 * np.pi * self.frequency * t)
+
+        elif self.disturbance_type == "step":
+            return mag if t > 10.0 else 0.0
+
+        elif self.disturbance_type == "impulse":
+            if (t % 10.0) < 0.5:
+                return mag
+            return 0.0
+
+        return 0.0
